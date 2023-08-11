@@ -131,24 +131,25 @@ export default class TimeGrid extends Component {
     })
   }
 
-  renderEvents(range, events, backgroundEvents, now) {
+  // now param passed by getNow() in args
+  renderDayColumns(range, events, backgroundEvents, now) {
     let { min, max, components, accessors, localizer, dayLayoutAlgorithm } =
       this.props
-
     const resources = this.memoizedResources(this.props.resources, accessors)
     const groupedEvents = resources.groupEvents(events)
     const groupedBackgroundEvents = resources.groupEvents(backgroundEvents)
 
     return resources.map(([id, resource], i) =>
       range.map((date, jj) => {
-        let daysEvents = (groupedEvents.get(id) || []).filter((event) =>
-          localizer.inRange(
+        // jj is for key but not advised to use index for key
+        let daysEvents = (groupedEvents.get(id) || []).filter((event) => {
+          return localizer.inRange(
             date,
             accessors.start(event),
             accessors.end(event),
             'day'
           )
-        )
+        })
 
         let daysBackgroundEvents = (
           groupedBackgroundEvents.get(id) || []
@@ -160,7 +161,9 @@ export default class TimeGrid extends Component {
             'day'
           )
         )
-
+        // date is the element type in the range array that TimeGrid accepts as a prop
+        // now is from getNow() which is an arg to renderDayColumns
+        // isNow is really isToday
         return (
           <DayColumn
             {...this.props}
@@ -295,7 +298,7 @@ export default class TimeGrid extends Component {
             className="rbc-time-gutter"
             getters={getters}
           />
-          {this.renderEvents(
+          {this.renderDayColumns(
             range,
             rangeEvents,
             rangeBackgroundEvents,
@@ -382,7 +385,11 @@ export default class TimeGrid extends Component {
   calculateScroll(props = this.props) {
     const { min, max, scrollToTime, localizer } = props
 
-    const diffMillis = localizer.diff(localizer.merge(scrollToTime, min), scrollToTime, 'milliseconds')
+    const diffMillis = localizer.diff(
+      localizer.merge(scrollToTime, min),
+      scrollToTime,
+      'milliseconds'
+    )
     const totalMillis = localizer.diff(min, max, 'milliseconds')
 
     this._scrollRatio = diffMillis / totalMillis

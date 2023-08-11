@@ -53,6 +53,7 @@ export default function Basic({
           max={max}
           showMultiDayTimes
           step={60}
+          view={views.DAY}
           views={views}
         />
       </div>
