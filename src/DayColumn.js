@@ -15,34 +15,7 @@ import { DayLayoutAlgorithmPropType } from './utils/propTypes'
 import DayColumnWrapper from './DayColumnWrapper'
 
 // isNow is true if the DayColumn's date is today
-const DayColumn2 = ({
-  // accessors,
-  // components: { eventContainerWrapper: EventContainer, ...components },
-  // date,
-  // dayLayoutAlgorithm,
-  // getNow,
-  // getters: { dayProp, ...getters },
-  // isNow,
-  // localizer,
-  // longPressThreshold,
-  // max,
-  // min,
-  // onDoubleClickEvent,
-  // onKeyPressEvent,
-  // onSelectEvent,
-  // onSelecting,
-  // onSelectSlot,
-  // onView,
-  // resizable,
-  // resource,
-  // rtl,
-  // selectable,
-  // selected,
-  // step,
-  // timeslots,
-  // views,
-  ...props
-}) => {
+const DayColumn2 = ({ ...props }) => {
   const {
     accessors,
     components: { eventContainerWrapper: EventContainer, ...components },
