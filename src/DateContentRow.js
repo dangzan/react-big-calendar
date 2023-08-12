@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useImperativeHandle, useRef } from 'react'
 import clsx from 'clsx'
 import qsa from 'dom-helpers/querySelectorAll'
 import PropTypes from 'prop-types'
@@ -9,7 +9,7 @@ import NoopWrapper from './NoopWrapper'
 import ScrollableWeekWrapper from './ScrollableWeekWrapper'
 import * as DateSlotMetrics from './utils/DateSlotMetrics'
 
-const DateContentRow = (props) => {
+const DateContentRow = React.forwardRef((props, ref) => {
   const {
     accessors,
     className,
@@ -44,6 +44,14 @@ const DateContentRow = (props) => {
 
   const slotMetrics = DateSlotMetrics.getSlotMetrics()
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      getRowLimit,
+    }),
+    []
+  )
+
   const handleSelectSlot = (slot) => {
     onSelectSlot(range.slice(slot.start, slot.end + 1), slot)
   }
@@ -64,16 +72,27 @@ const DateContentRow = (props) => {
     return container ? container() : containerRef.current
   }
 
-  // function getRowLimit() {
-  //   /* Guessing this only gets called on the dummyRow */
-  //   const eventHeight = getHeight(eventRowRef.current)
-  //   const headingHeight = headingRowRef?.current
-  //     ? getHeight(headingRowRef.current)
-  //     : 0
-  //   const eventSpace = getHeight(containerRef.current) - headingHeight
+  function getRowLimit() {
+    /* Guessing this only gets called on the dummyRow */
+    const eventHeight = eventRowRef.current
+      ? getHeight(eventRowRef.current)
+      : undefined
+    const headingHeight = headingRowRef?.current
+      ? getHeight(headingRowRef.current)
+      : 0
+    const eventSpace = containerRef.current
+      ? getHeight(containerRef.current) - headingHeight
+      : undefined
+    // console.log(`eventHeight: `, eventHeight)
+    // console.log(`headingHeight: `, headingHeight)
+    // console.log(`eventSpace: `, eventSpace)
 
-  //   return Math.max(Math.floor(eventSpace / eventHeight), 1)
-  // }
+    return Math.max(Math.floor(eventSpace / eventHeight), 1)
+  }
+
+  function getHeight(element) {
+    return element.offsetHeight
+  }
 
   const renderHeadingCell = (date, index) => {
     let { renderHeader, getNow, localizer } = props
@@ -187,7 +206,7 @@ const DateContentRow = (props) => {
       </div>
     </div>
   )
-}
+})
 
 DateContentRow.propTypes = {
   date: PropTypes.instanceOf(Date),

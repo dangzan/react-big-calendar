@@ -15,7 +15,7 @@ import { DayLayoutAlgorithmPropType } from './utils/propTypes'
 import DayColumnWrapper from './DayColumnWrapper'
 
 // isNow is true if the DayColumn's date is today
-const DayColumn2 = ({ ...props }) => {
+const DayColumn = ({ ...props }) => {
   const {
     accessors,
     components: { eventContainerWrapper: EventContainer, ...components },
@@ -409,7 +409,7 @@ const DayColumn2 = ({ ...props }) => {
   }
 }
 
-DayColumn2.propTypes = {
+DayColumn.propTypes = {
   events: PropTypes.array.isRequired,
   backgroundEvents: PropTypes.array.isRequired,
   step: PropTypes.number.isRequired,
@@ -449,9 +449,9 @@ DayColumn2.propTypes = {
   dayLayoutAlgorithm: DayLayoutAlgorithmPropType,
 }
 
-DayColumn2.defaultProps = {
+DayColumn.defaultProps = {
   dragThroughEvents: true,
   timeslots: 2,
 }
 
-export default DayColumn2
+export default DayColumn
