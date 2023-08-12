@@ -1,6 +1,7 @@
 import React, { useImperativeHandle, useRef } from 'react'
 import clsx from 'clsx'
 import qsa from 'dom-helpers/querySelectorAll'
+import getHeight from 'dom-helpers/height'
 import PropTypes from 'prop-types'
 import BackgroundCells from './BackgroundCells'
 import EventRow from './EventRow'
@@ -74,24 +75,13 @@ const DateContentRow = React.forwardRef((props, ref) => {
 
   function getRowLimit() {
     /* Guessing this only gets called on the dummyRow */
-    const eventHeight = eventRowRef.current
-      ? getHeight(eventRowRef.current)
-      : undefined
+    const eventHeight = getHeight(eventRowRef.current)
     const headingHeight = headingRowRef?.current
       ? getHeight(headingRowRef.current)
       : 0
-    const eventSpace = containerRef.current
-      ? getHeight(containerRef.current) - headingHeight
-      : undefined
-    // console.log(`eventHeight: `, eventHeight)
-    // console.log(`headingHeight: `, headingHeight)
-    // console.log(`eventSpace: `, eventSpace)
+    const eventSpace = getHeight(containerRef.current) - headingHeight
 
     return Math.max(Math.floor(eventSpace / eventHeight), 1)
-  }
-
-  function getHeight(element) {
-    return element.offsetHeight
   }
 
   const renderHeadingCell = (date, index) => {
