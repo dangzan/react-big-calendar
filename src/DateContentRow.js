@@ -1,9 +1,7 @@
-import React, { createRef } from 'react'
+import React, { useRef } from 'react'
 import clsx from 'clsx'
-import getHeight from 'dom-helpers/height'
 import qsa from 'dom-helpers/querySelectorAll'
 import PropTypes from 'prop-types'
-
 import BackgroundCells from './BackgroundCells'
 import EventRow from './EventRow'
 import EventEndingRow from './EventEndingRow'
@@ -11,27 +9,49 @@ import NoopWrapper from './NoopWrapper'
 import ScrollableWeekWrapper from './ScrollableWeekWrapper'
 import * as DateSlotMetrics from './utils/DateSlotMetrics'
 
-class DateContentRow extends React.Component {
-  constructor(...args) {
-    super(...args)
+const DateContentRow = (props) => {
+  const {
+    accessors,
+    className,
+    components,
+    container,
+    date,
+    getNow,
+    getters,
+    isAllDay,
+    localizer,
+    longPressThreshold,
+    onSelectSlot,
+    onSelect,
+    onSelectEnd,
+    onSelectStart,
+    onDoubleClick,
+    onKeyPress,
+    range,
+    renderForMeasure,
+    renderHeader,
+    resizable,
+    resourceId,
+    rtl,
+    selectable,
+    selected,
+    showAllEvents,
+  } = props
 
-    this.containerRef = createRef()
-    this.headingRowRef = createRef()
-    this.eventRowRef = createRef()
+  const containerRef = useRef()
+  const headingRowRef = useRef()
+  const eventRowRef = useRef()
 
-    this.slotMetrics = DateSlotMetrics.getSlotMetrics()
-  }
+  const slotMetrics = DateSlotMetrics.getSlotMetrics()
 
-  handleSelectSlot = (slot) => {
-    const { range, onSelectSlot } = this.props
-
+  const handleSelectSlot = (slot) => {
     onSelectSlot(range.slice(slot.start, slot.end + 1), slot)
   }
 
-  handleShowMore = (slot, target) => {
-    const { range, onShowMore } = this.props
-    let metrics = this.slotMetrics(this.props)
-    let row = qsa(this.containerRef.current, '.rbc-row-bg')[0]
+  const handleShowMore = (slot, target) => {
+    const { range, onShowMore } = props
+    let metrics = slotMetrics(props)
+    let row = qsa(containerRef.current, '.rbc-row-bg')[0]
 
     let cell
     if (row) cell = row.children[slot - 1]
@@ -40,24 +60,23 @@ class DateContentRow extends React.Component {
     onShowMore(events, range[slot - 1], cell, slot, target)
   }
 
-  getContainer = () => {
-    const { container } = this.props
-    return container ? container() : this.containerRef.current
+  const getContainer = () => {
+    return container ? container() : containerRef.current
   }
 
-  getRowLimit() {
-    /* Guessing this only gets called on the dummyRow */
-    const eventHeight = getHeight(this.eventRowRef.current)
-    const headingHeight = this.headingRowRef?.current
-      ? getHeight(this.headingRowRef.current)
-      : 0
-    const eventSpace = getHeight(this.containerRef.current) - headingHeight
+  // function getRowLimit() {
+  //   /* Guessing this only gets called on the dummyRow */
+  //   const eventHeight = getHeight(eventRowRef.current)
+  //   const headingHeight = headingRowRef?.current
+  //     ? getHeight(headingRowRef.current)
+  //     : 0
+  //   const eventSpace = getHeight(containerRef.current) - headingHeight
 
-    return Math.max(Math.floor(eventSpace / eventHeight), 1)
-  }
+  //   return Math.max(Math.floor(eventSpace / eventHeight), 1)
+  // }
 
-  renderHeadingCell = (date, index) => {
-    let { renderHeader, getNow, localizer } = this.props
+  const renderHeadingCell = (date, index) => {
+    let { renderHeader, getNow, localizer } = props
 
     return renderHeader({
       date,
@@ -69,10 +88,10 @@ class DateContentRow extends React.Component {
     })
   }
 
-  renderDummy = () => {
-    let { className, range, renderHeader, showAllEvents } = this.props
+  const renderDummy = () => {
+    let { className, range, renderHeader, showAllEvents } = props
     return (
-      <div className={className} ref={this.containerRef}>
+      <div className={className} ref={containerRef}>
         <div
           className={clsx(
             'rbc-row-content',
@@ -80,11 +99,11 @@ class DateContentRow extends React.Component {
           )}
         >
           {renderHeader && (
-            <div className="rbc-row" ref={this.headingRowRef}>
-              {range.map(this.renderHeadingCell)}
+            <div className="rbc-row" ref={headingRowRef}>
+              {range.map(renderHeadingCell)}
             </div>
           )}
-          <div className="rbc-row" ref={this.eventRowRef}>
+          <div className="rbc-row" ref={eventRowRef}>
             <div className="rbc-row-segment">
               <div className="rbc-event">
                 <div className="rbc-event-content">&nbsp;</div>
@@ -96,108 +115,78 @@ class DateContentRow extends React.Component {
     )
   }
 
-  render() {
-    const {
-      date,
-      rtl,
-      range,
-      className,
-      selected,
-      selectable,
-      renderForMeasure,
+  if (renderForMeasure) return renderDummy()
 
-      accessors,
-      getters,
-      components,
+  let metrics = slotMetrics(props)
+  let { levels, extra } = metrics
 
-      getNow,
-      renderHeader,
-      onSelect,
-      localizer,
-      onSelectStart,
-      onSelectEnd,
-      onDoubleClick,
-      onKeyPress,
-      resourceId,
-      longPressThreshold,
-      isAllDay,
-      resizable,
-      showAllEvents,
-    } = this.props
+  let ScrollableWeekComponent = showAllEvents
+    ? ScrollableWeekWrapper
+    : NoopWrapper
+  let WeekWrapper = components.weekWrapper
 
-    if (renderForMeasure) return this.renderDummy()
-
-    let metrics = this.slotMetrics(this.props)
-    let { levels, extra } = metrics
-
-    let ScrollableWeekComponent = showAllEvents
-      ? ScrollableWeekWrapper
-      : NoopWrapper
-    let WeekWrapper = components.weekWrapper
-
-    const eventRowProps = {
-      selected,
-      accessors,
-      getters,
-      localizer,
-      components,
-      onSelect,
-      onDoubleClick,
-      onKeyPress,
-      resourceId,
-      slotMetrics: metrics,
-      resizable,
-    }
-
-    return (
-      <div className={className} role="rowgroup" ref={this.containerRef}>
-        <BackgroundCells
-          localizer={localizer}
-          date={date}
-          getNow={getNow}
-          rtl={rtl}
-          range={range}
-          selectable={selectable}
-          container={this.getContainer}
-          getters={getters}
-          onSelectStart={onSelectStart}
-          onSelectEnd={onSelectEnd}
-          onSelectSlot={this.handleSelectSlot}
-          components={components}
-          longPressThreshold={longPressThreshold}
-          resourceId={resourceId}
-        />
-
-        <div
-          className={clsx(
-            'rbc-row-content',
-            showAllEvents && 'rbc-row-content-scrollable'
-          )}
-          role="row"
-        >
-          {renderHeader && (
-            <div className="rbc-row " ref={this.headingRowRef}>
-              {range.map(this.renderHeadingCell)}
-            </div>
-          )}
-          <ScrollableWeekComponent>
-            <WeekWrapper isAllDay={isAllDay} {...eventRowProps}>
-              {levels.map((segs, idx) => (
-                <EventRow key={idx} segments={segs} {...eventRowProps} />
-              ))}
-              {!!extra.length && (
-                <EventEndingRow
-                  segments={extra}
-                  onShowMore={this.handleShowMore}
-                  {...eventRowProps}
-                />
-              )}
-            </WeekWrapper>
-          </ScrollableWeekComponent>
-        </div>
-      </div>
-    )
+  const eventRowProps = {
+    selected,
+    accessors,
+    getters,
+    localizer,
+    components,
+    onSelect,
+    onDoubleClick,
+    onKeyPress,
+    resourceId,
+    slotMetrics: metrics,
+    resizable,
   }
+
+  return (
+    <div className={className} role="rowgroup" ref={containerRef}>
+      <BackgroundCells
+        localizer={localizer}
+        date={date}
+        getNow={getNow}
+        rtl={rtl}
+        range={range}
+        selectable={selectable}
+        container={getContainer}
+        getters={getters}
+        onSelectStart={onSelectStart}
+        onSelectEnd={onSelectEnd}
+        onSelectSlot={handleSelectSlot}
+        components={components}
+        longPressThreshold={longPressThreshold}
+        resourceId={resourceId}
+      />
+
+      <div
+        className={clsx(
+          'rbc-row-content',
+          showAllEvents && 'rbc-row-content-scrollable'
+        )}
+        role="row"
+      >
+        {renderHeader && (
+          <div className="rbc-row " ref={headingRowRef}>
+            {range.map(renderHeadingCell)}
+          </div>
+        )}
+        <ScrollableWeekComponent>
+          <WeekWrapper isAllDay={isAllDay} {...eventRowProps}>
+            {levels.map((segs, idx) => (
+              <EventRow key={idx} segments={segs} {...eventRowProps} />
+            ))}
+            {!!extra.length && (
+              <EventEndingRow
+                segments={extra}
+                onShowMore={handleShowMore}
+                {...eventRowProps}
+              />
+            )}
+          </WeekWrapper>
+        </ScrollableWeekComponent>
+      </div>
+    </div>
+  )
 }
 
 DateContentRow.propTypes = {
