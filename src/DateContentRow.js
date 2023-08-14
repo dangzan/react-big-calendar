@@ -26,6 +26,7 @@ const DateContentRow = React.forwardRef((props, ref) => {
     onSelect,
     onSelectEnd,
     onSelectStart,
+    onShowMore,
     onDoubleClick,
     onKeyPress,
     range,
@@ -58,7 +59,6 @@ const DateContentRow = React.forwardRef((props, ref) => {
   }
 
   const handleShowMore = (slot, target) => {
-    const { range, onShowMore } = props
     let metrics = slotMetrics(props)
     let row = qsa(containerRef.current, '.rbc-row-bg')[0]
 
@@ -80,8 +80,8 @@ const DateContentRow = React.forwardRef((props, ref) => {
       ? getHeight(headingRowRef.current)
       : 0
     const eventSpace = getHeight(containerRef.current) - headingHeight
-
-    return Math.max(Math.floor(eventSpace / eventHeight), 1)
+    const rowLimit = Math.max(Math.floor(eventSpace / eventHeight), 1)
+    return rowLimit
   }
 
   const renderHeadingCell = (date, index) => {
@@ -94,9 +94,11 @@ const DateContentRow = React.forwardRef((props, ref) => {
         'rbc-date-cell',
         localizer.isSameDate(date, getNow()) && 'rbc-now'
       ),
+      localizer,
     })
   }
 
+  // I'm not sure this will ever run again
   const renderDummy = () => {
     let { className, range, renderHeader, showAllEvents } = props
     return (
@@ -147,6 +149,8 @@ const DateContentRow = React.forwardRef((props, ref) => {
     slotMetrics: metrics,
     resizable,
   }
+
+  // className is rbc-allday-cell
 
   return (
     <div className={className} role="rowgroup" ref={containerRef}>

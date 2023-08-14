@@ -55,9 +55,9 @@ const DayColumn = ({ ...props }) => {
     endDate: Date,
   })
 
-  const prevPropsRef = useRef()
-  const prevTimeIndicatorPositionRef = useRef()
-  let containerRef = useRef()
+  const prevPropsRef = useRef(null)
+  const prevTimeIndicatorPositionRef = useRef(null)
+  const containerRef = useRef(null)
   let slotMetrics = TimeSlotUtils.getSlotMetrics(props)
 
   // storing timeIndicatorPosition for comparison later
@@ -74,6 +74,9 @@ const DayColumn = ({ ...props }) => {
   useEffect(() => {
     if (selectable && !prevPropsRef.current.selectable) _selectable()
     if (!selectable && prevPropsRef.current.selectable) teardownSelectable()
+    if (timeIndicatorTimeoutId) {
+      clearTimeIndicatorInterval(timeIndicatorTimeoutId)
+    }
     slotMetrics = slotMetrics.update(props)
   }, [props])
 
@@ -86,8 +89,9 @@ const DayColumn = ({ ...props }) => {
 
     return () => {
       teardownSelectable()
-      if (timeIndicatorTimeoutId)
+      if (timeIndicatorTimeoutId) {
         clearTimeIndicatorInterval(timeIndicatorTimeoutId)
+      }
     }
   }, [])
 
@@ -137,6 +141,7 @@ const DayColumn = ({ ...props }) => {
   function clearTimeIndicatorInterval() {
     setIntervalTriggered(false)
     clearTimeout(timeIndicatorTimeoutId)
+    setTimeIndicatorTimeoutId(null)
   }
 
   function positionTimeIndicator() {
