@@ -1,4 +1,4 @@
-import React, { Component, createRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import clsx from 'clsx'
 import * as animationFrame from 'dom-helpers/animationFrame'
@@ -17,96 +17,140 @@ import { notify } from './utils/helpers'
 import Resources from './utils/Resources'
 import { DayLayoutAlgorithmPropType } from './utils/propTypes'
 
-export default class TimeGrid extends Component {
-  constructor(props) {
-    super(props)
+const TimeGrid = (props) => {
+  const {
+    events,
+    backgroundEvents,
+    range,
+    width,
+    rtl,
+    selected,
+    getNow,
+    resources,
+    components,
+    accessors,
+    getters,
+    localizer,
+    onSelectSlot,
+    min,
+    max,
+    showMultiDayTimes,
+    longPressThreshold,
+    popup,
+    onDrillDown,
+    onShowMore,
+    getDrilldownView,
+    doShowMoreDrillDown,
+    resizable,
+    popupOffset,
+    handleDragStart,
 
-    this.state = { gutterWidth: undefined, isOverflowing: null }
+    step,
+    timeslots,
 
-    this.scrollRef = React.createRef()
-    this.contentRef = React.createRef()
-    this.containerRef = React.createRef()
-    this._scrollRatio = null
-    this.gutterRef = createRef()
-  }
+    scrollToTime,
+    enableAutoScroll,
 
-  getSnapshotBeforeUpdate() {
-    this.checkOverflow()
-    return null
-  }
+    allDayMaxRows,
 
-  componentDidMount() {
-    if (this.props.width == null) {
-      this.measureGutter()
+    selectable,
+
+    onSelectEvent,
+    onDoubleClickEvent,
+    onKeyPressEvent,
+
+    dayLayoutAlgorithm,
+
+    showAllEvents,
+  } = props
+
+  const [gutterWidth, setGutterWidth] = useState()
+  const [isOverflowing, setIsOverflowing] = useState()
+  const [rafHandle, setRafHandle] = useState()
+  const [
+    measureGutterAnimationFrameRequest,
+    setMeasureGutterAnimationFrameRequest,
+  ] = useState()
+  const [overlay, setOverlay] = useState()
+  const updatingOverflowRef = useRef(false)
+  const scrollRef = useRef()
+  const contentRef = useRef()
+  const containerRef = useRef()
+  const scrollRatio = useRef()
+  const gutterRef = useRef()
+  const pendingSelection = useRef()
+
+  let timeoutId // this never gets assigned to in original; placeholder for now to prevent error
+
+  useEffect(() => {
+    if (updatingOverflowRef.current) {
+      updatingOverflowRef.current = false
+    }
+  }, [isOverflowing])
+
+  useEffect(() => {
+    checkOverflow()
+
+    if (width == null) {
+      measureGutter()
     }
 
-    this.calculateScroll()
-    this.applyScroll()
+    calculateScroll()
+    applyScroll()
 
-    window.addEventListener('resize', this.handleResize)
-  }
+    window.addEventListener('resize', handleResize)
 
-  handleScroll = (e) => {
-    if (this.scrollRef.current) {
-      this.scrollRef.current.scrollLeft = e.target.scrollLeft
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      animationFrame.cancel(rafHandle)
+
+      if (measureGutterAnimationFrameRequest) {
+        window.cancelAnimationFrame(measureGutterAnimationFrameRequest)
+      }
+    }
+  }, [])
+
+  const memoizedResources = memoize((resources, accessors) =>
+    Resources(resources, accessors)
+  )
+
+  function handleScroll(e) {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = e.target.scrollLeft
     }
   }
 
-  handleResize = () => {
-    animationFrame.cancel(this.rafHandle)
-    this.rafHandle = animationFrame.request(this.checkOverflow)
+  function handleResize() {
+    animationFrame.cancel(rafHandle)
+    setRafHandle(animationFrame.request(checkOverflow))
   }
 
-  componentWillUnmount() {
-    window.removeEventListener('resize', this.handleResize)
-
-    animationFrame.cancel(this.rafHandle)
-
-    if (this.measureGutterAnimationFrameRequest) {
-      window.cancelAnimationFrame(this.measureGutterAnimationFrameRequest)
-    }
+  const handleKeyPressEvent = (...args) => {
+    clearSelection()
+    notify(onKeyPressEvent, args)
   }
 
-  componentDidUpdate() {
-    this.applyScroll()
-  }
-
-  handleKeyPressEvent = (...args) => {
-    this.clearSelection()
-    notify(this.props.onKeyPressEvent, args)
-  }
-
-  handleSelectEvent = (...args) => {
+  const handleSelectEvent = (...args) => {
     //cancel any pending selections so only the event click goes through.
-    this.clearSelection()
-    notify(this.props.onSelectEvent, args)
+    clearSelection()
+    notify(onSelectEvent, args)
   }
 
-  handleDoubleClickEvent = (...args) => {
-    this.clearSelection()
-    notify(this.props.onDoubleClickEvent, args)
+  const handleDoubleClickEvent = (...args) => {
+    clearSelection()
+    notify(onDoubleClickEvent, args)
   }
 
-  handleShowMore = (events, date, cell, slot, target) => {
-    const {
-      popup,
-      onDrillDown,
-      onShowMore,
-      getDrilldownView,
-      doShowMoreDrillDown,
-    } = this.props
-    this.clearSelection()
+  const handleShowMore = (events, date, cell, slot, target) => {
+    clearSelection()
 
     if (popup) {
-      let position = getPosition(cell, this.containerRef.current)
-
-      this.setState({
-        overlay: {
-          date,
-          events,
-          position: { ...position, width: '200px' },
-          target,
-        },
+      let position = getPosition(cell, containerRef.current)
+      setOverlay({
+        date,
+        events,
+        position: { ...position, width: '200px' },
+        target,
       })
     } else if (doShowMoreDrillDown) {
       notify(onDrillDown, [date, getDrilldownView(date) || views.DAY])
@@ -115,9 +159,7 @@ export default class TimeGrid extends Component {
     notify(onShowMore, [events, date, slot])
   }
 
-  handleSelectAllDaySlot = (slots, slotInfo) => {
-    const { onSelectSlot } = this.props
-
+  const handleSelectAllDaySlot = (slots, slotInfo) => {
     const start = new Date(slots[0])
     const end = new Date(slots[slots.length - 1])
     end.setDate(slots[slots.length - 1].getDate() + 1)
@@ -132,10 +174,8 @@ export default class TimeGrid extends Component {
   }
 
   // now param passed by getNow() in args
-  renderDayColumns(range, events, backgroundEvents, now) {
-    let { min, max, components, accessors, localizer, dayLayoutAlgorithm } =
-      this.props
-    const resources = this.memoizedResources(this.props.resources, accessors)
+  function renderDayColumns(range, events, backgroundEvents, now) {
+    const resources = memoizedResources(resources, accessors)
     const groupedEvents = resources.groupEvents(events)
     const groupedBackgroundEvents = resources.groupEvents(backgroundEvents)
 
@@ -166,7 +206,7 @@ export default class TimeGrid extends Component {
         // isNow is really isToday
         return (
           <DayColumn
-            {...this.props}
+            {...props}
             localizer={localizer}
             min={localizer.merge(date, min)}
             max={localizer.merge(date, max)}
@@ -184,207 +224,153 @@ export default class TimeGrid extends Component {
     )
   }
 
-  render() {
-    let {
-      events,
-      backgroundEvents,
-      range,
-      width,
-      rtl,
-      selected,
-      getNow,
-      resources,
-      components,
-      accessors,
-      getters,
-      localizer,
-      min,
-      max,
-      showMultiDayTimes,
-      longPressThreshold,
-      resizable,
-    } = this.props
+  let start = range[0],
+    end = range[range.length - 1]
 
-    width = width || this.state.gutterWidth
+  let allDayEvents = [],
+    rangeEvents = [],
+    rangeBackgroundEvents = []
 
-    let start = range[0],
-      end = range[range.length - 1]
+  events.forEach((event) => {
+    if (inRange(event, start, end, accessors, localizer)) {
+      let eStart = accessors.start(event),
+        eEnd = accessors.end(event)
 
-    this.slots = range.length
-
-    let allDayEvents = [],
-      rangeEvents = [],
-      rangeBackgroundEvents = []
-
-    events.forEach((event) => {
-      if (inRange(event, start, end, accessors, localizer)) {
-        let eStart = accessors.start(event),
-          eEnd = accessors.end(event)
-
-        if (
-          accessors.allDay(event) ||
-          localizer.startAndEndAreDateOnly(eStart, eEnd) ||
-          (!showMultiDayTimes && !localizer.isSameDate(eStart, eEnd))
-        ) {
-          allDayEvents.push(event)
-        } else {
-          rangeEvents.push(event)
-        }
+      if (
+        accessors.allDay(event) ||
+        localizer.startAndEndAreDateOnly(eStart, eEnd) ||
+        (!showMultiDayTimes && !localizer.isSameDate(eStart, eEnd))
+      ) {
+        allDayEvents.push(event)
+      } else {
+        rangeEvents.push(event)
       }
-    })
+    }
+  })
 
-    backgroundEvents.forEach((event) => {
-      if (inRange(event, start, end, accessors, localizer)) {
-        rangeBackgroundEvents.push(event)
-      }
-    })
+  backgroundEvents.forEach((event) => {
+    if (inRange(event, start, end, accessors, localizer)) {
+      rangeBackgroundEvents.push(event)
+    }
+  })
 
-    allDayEvents.sort((a, b) => sortEvents(a, b, accessors, localizer))
+  allDayEvents.sort((a, b) => sortEvents(a, b, accessors, localizer))
 
-    return (
+  return (
+    <div
+      className={clsx('rbc-time-view', resources && 'rbc-time-view-resources')}
+      ref={containerRef}
+    >
+      <TimeGridHeader
+        range={range}
+        events={allDayEvents}
+        width={width || gutterWidth}
+        rtl={rtl}
+        getNow={getNow}
+        localizer={localizer}
+        selected={selected}
+        allDayMaxRows={showAllEvents ? Infinity : allDayMaxRows ?? Infinity}
+        resources={memoizedResources(resources, accessors)}
+        selectable={selectable}
+        accessors={accessors}
+        getters={getters}
+        components={components}
+        scrollRef={scrollRef}
+        isOverflowing={isOverflowing}
+        longPressThreshold={longPressThreshold}
+        onSelectSlot={handleSelectAllDaySlot}
+        onSelectEvent={handleSelectEvent}
+        onShowMore={handleShowMore}
+        onDoubleClickEvent={onDoubleClickEvent}
+        onKeyPressEvent={onKeyPressEvent}
+        onDrillDown={onDrillDown}
+        getDrilldownView={getDrilldownView}
+        resizable={resizable}
+      />
+      {popup && renderOverlay()}
       <div
-        className={clsx(
-          'rbc-time-view',
-          resources && 'rbc-time-view-resources'
-        )}
-        ref={this.containerRef}
+        ref={contentRef}
+        className="rbc-time-content"
+        onScroll={handleScroll}
       >
-        <TimeGridHeader
-          range={range}
-          events={allDayEvents}
-          width={width}
-          rtl={rtl}
-          getNow={getNow}
+        <TimeGutter
+          date={start}
+          ref={gutterRef}
           localizer={localizer}
-          selected={selected}
-          allDayMaxRows={
-            this.props.showAllEvents
-              ? Infinity
-              : this.props.allDayMaxRows ?? Infinity
-          }
-          resources={this.memoizedResources(resources, accessors)}
-          selectable={this.props.selectable}
-          accessors={accessors}
-          getters={getters}
+          min={localizer.merge(start, min)}
+          max={localizer.merge(start, max)}
+          step={step}
+          getNow={getNow}
+          timeslots={timeslots}
           components={components}
-          scrollRef={this.scrollRef}
-          isOverflowing={this.state.isOverflowing}
-          longPressThreshold={longPressThreshold}
-          onSelectSlot={this.handleSelectAllDaySlot}
-          onSelectEvent={this.handleSelectEvent}
-          onShowMore={this.handleShowMore}
-          onDoubleClickEvent={this.props.onDoubleClickEvent}
-          onKeyPressEvent={this.props.onKeyPressEvent}
-          onDrillDown={this.props.onDrillDown}
-          getDrilldownView={this.props.getDrilldownView}
-          resizable={resizable}
+          className="rbc-time-gutter"
+          getters={getters}
         />
-        {this.props.popup && this.renderOverlay()}
-        <div
-          ref={this.contentRef}
-          className="rbc-time-content"
-          onScroll={this.handleScroll}
-        >
-          <TimeGutter
-            date={start}
-            ref={this.gutterRef}
-            localizer={localizer}
-            min={localizer.merge(start, min)}
-            max={localizer.merge(start, max)}
-            step={this.props.step}
-            getNow={this.props.getNow}
-            timeslots={this.props.timeslots}
-            components={components}
-            className="rbc-time-gutter"
-            getters={getters}
-          />
-          {this.renderDayColumns(
-            range,
-            rangeEvents,
-            rangeBackgroundEvents,
-            getNow()
-          )}
-        </div>
+        {renderDayColumns(range, rangeEvents, rangeBackgroundEvents, getNow())}
       </div>
-    )
-  }
+    </div>
+  )
 
-  renderOverlay() {
-    let overlay = this.state?.overlay ?? {}
-    let {
-      accessors,
-      localizer,
-      components,
-      getters,
-      selected,
-      popupOffset,
-      handleDragStart,
-    } = this.props
+  function renderOverlay() {
+    let currentOverlay = overlay ?? {}
 
-    const onHide = () => this.setState({ overlay: null })
+    const onHide = () => setOverlay(null)
 
     return (
       <PopOverlay
-        overlay={overlay}
+        overlay={currentOverlay}
         accessors={accessors}
         localizer={localizer}
         components={components}
         getters={getters}
         selected={selected}
         popupOffset={popupOffset}
-        ref={this.containerRef}
-        handleKeyPressEvent={this.handleKeyPressEvent}
-        handleSelectEvent={this.handleSelectEvent}
-        handleDoubleClickEvent={this.handleDoubleClickEvent}
+        ref={containerRef}
+        handleKeyPressEvent={handleKeyPressEvent}
+        handleSelectEvent={handleSelectEvent}
+        handleDoubleClickEvent={handleDoubleClickEvent}
         handleDragStart={handleDragStart}
-        show={!!overlay.position}
-        overlayDisplay={this.overlayDisplay}
+        show={!!currentOverlay?.position}
+        overlayDisplay={overlayDisplay}
         onHide={onHide}
       />
     )
   }
 
-  overlayDisplay = () => {
-    this.setState({
-      overlay: null,
-    })
+  function overlayDisplay() {
+    setOverlay(null)
   }
 
-  clearSelection() {
-    clearTimeout(this._selectTimer)
-    this._pendingSelection = []
+  function clearSelection() {
+    clearTimeout(timeoutId)
+    pendingSelection.current = []
   }
 
-  measureGutter() {
-    if (this.measureGutterAnimationFrameRequest) {
-      window.cancelAnimationFrame(this.measureGutterAnimationFrameRequest)
+  function measureGutter() {
+    if (measureGutterAnimationFrameRequest) {
+      window.cancelAnimationFrame(measureGutterAnimationFrameRequest)
     }
-    this.measureGutterAnimationFrameRequest = window.requestAnimationFrame(
-      () => {
-        const width = this.gutterRef?.current
-          ? getWidth(this.gutterRef.current)
-          : undefined
+    const requestAnimationFrameValue = window.requestAnimationFrame(() => {
+      const width = gutterRef?.current ? getWidth(gutterRef.current) : undefined
 
-        if (width && this.state.gutterWidth !== width) {
-          this.setState({ gutterWidth: width })
-        }
+      if (width && gutterWidth !== width) {
+        setGutterWidth(width)
       }
-    )
+    })
+    setMeasureGutterAnimationFrameRequest(requestAnimationFrameValue)
   }
 
-  applyScroll() {
+  function applyScroll() {
     // If auto-scroll is disabled, we don't actually apply the scroll
-    if (this._scrollRatio != null && this.props.enableAutoScroll === true) {
-      const content = this.contentRef.current
-      content.scrollTop = content.scrollHeight * this._scrollRatio
+    if (scrollRatio.current != null && enableAutoScroll === true) {
+      const content = contentRef.current
+      content.scrollTop = content.scrollHeight * scrollRatio.current
       // Only do this once
-      this._scrollRatio = null
+      scrollRatio.current = null
     }
   }
 
-  calculateScroll(props = this.props) {
-    const { min, max, scrollToTime, localizer } = props
-
+  function calculateScroll() {
     const diffMillis = localizer.diff(
       localizer.merge(scrollToTime, min),
       scrollToTime,
@@ -392,26 +378,20 @@ export default class TimeGrid extends Component {
     )
     const totalMillis = localizer.diff(min, max, 'milliseconds')
 
-    this._scrollRatio = diffMillis / totalMillis
+    scrollRatio.current = diffMillis / totalMillis
   }
 
-  checkOverflow = () => {
-    if (this._updatingOverflow) return
+  function checkOverflow() {
+    if (updatingOverflowRef.current) return
 
-    const content = this.contentRef.current
-    let isOverflowing = content.scrollHeight > content.clientHeight
+    const content = contentRef.current
+    const isContentOverflowing = content.scrollHeight > content.clientHeight
 
-    if (this.state.isOverflowing !== isOverflowing) {
-      this._updatingOverflow = true
-      this.setState({ isOverflowing }, () => {
-        this._updatingOverflow = false
-      })
+    if (isOverflowing !== isContentOverflowing) {
+      updatingOverflowRef.current = true
+      setIsOverflowing(isContentOverflowing)
     }
   }
-
-  memoizedResources = memoize((resources, accessors) =>
-    Resources(resources, accessors)
-  )
 }
 
 TimeGrid.propTypes = {
@@ -477,3 +457,5 @@ TimeGrid.defaultProps = {
   step: 30,
   timeslots: 2,
 }
+
+export default TimeGrid

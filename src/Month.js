@@ -41,6 +41,8 @@ const MonthView = (props) => {
     onDrillDown,
     getDrilldownView,
     popup,
+    popupOffset,
+    handleDragStart,
   } = props
 
   // with needLimitMeasure set to true, we get that dummyRow which flickers broken ui
@@ -218,21 +220,11 @@ const MonthView = (props) => {
     // modifying original which was not reading overlay created by useState
     let currentOverlay = overlay ?? {}
 
-    let {
-      accessors,
-      localizer,
-      components,
-      getters,
-      selected,
-      popupOffset,
-      handleDragStart,
-    } = props
-
     const onHide = () => setOverlay(null)
 
     return (
       <PopOverlay
-        overlay={overlay}
+        overlay={currentOverlay}
         accessors={accessors}
         localizer={localizer}
         components={components}
